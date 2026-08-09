@@ -2,6 +2,13 @@ import Dexie, { type Table } from "dexie";
 
 export type DocFormat = "pdf" | "docx" | "pptx" | "epub" | "txt";
 
+export interface TocItem {
+  label: string;
+  level: number;
+  page?: number;
+  anchor?: string;
+}
+
 export interface DocRecord {
   id?: number;
   title: string;
@@ -15,7 +22,9 @@ export interface DocRecord {
   tags: string[];
   archived: 0 | 1;
   textIndex?: string;
+  toc?: TocItem[];
 }
+
 
 export interface Annotation {
   id?: number;
