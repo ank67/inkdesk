@@ -25,7 +25,7 @@ export function DocxView({ blob, zoom, onLoaded }: Props) {
 
     (async () => {
       try {
-        const mammoth = await import("mammoth/mammoth.browser.js");
+        const mammoth = await import("mammoth");
         const buffer = await blob.arrayBuffer();
         const result = await mammoth.convertToHtml(
           { arrayBuffer: buffer },
