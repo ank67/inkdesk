@@ -125,7 +125,11 @@ async function buildToc(pdf: any): Promise<TocItem[]> {
       } catch {
         /* unresolvable destination */
       }
-      items.push({ label: String(node.title ?? "").trim() || "Untitled", level, page: pageNumber });
+      items.push({
+        label: String(node.title ?? "").trim() || "Untitled",
+        level,
+        ...(pageNumber === undefined ? {} : { page: pageNumber }),
+      });
       if (node.items?.length) await walk(node.items, level + 1);
     }
   };
