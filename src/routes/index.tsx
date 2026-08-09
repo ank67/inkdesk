@@ -58,9 +58,9 @@ function LibraryPage() {
         <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 sm:flex sm:gap-4">
           <div className="flex min-w-0 items-center gap-2">
             <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-linear-to-br from-primary to-accent">
-              <Library className="size-4.5 text-primary-foreground" aria-hidden="true" />
+              <BookOpen className="size-4.5 text-primary-foreground" aria-hidden="true" />
             </div>
-            <h1 className="truncate text-base font-semibold tracking-tight">Offline Reader</h1>
+            <h1 className="truncate text-base font-semibold tracking-tight">E-Book</h1>
           </div>
           <div className="relative order-last col-span-2 w-full sm:order-none sm:max-w-md">
             <Search
@@ -92,6 +92,7 @@ function LibraryPage() {
             >
               <List className="size-4.5" aria-hidden="true" />
             </button>
+            <ThemeControls />
           </div>
         </div>
       </header>
@@ -140,7 +141,7 @@ function LibraryPage() {
             <div className="rounded-2xl border border-dashed border-border p-10 text-center">
               <p className="text-sm font-medium">Nothing here yet</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Add a PDF, DOCX or PPTX file to start your offline library.
+                Add a PDF, DOCX, PPTX, EPUB or TXT file to start your offline library.
               </p>
             </div>
           ) : view === "grid" ? (
