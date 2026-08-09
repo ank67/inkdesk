@@ -160,6 +160,7 @@ async function headingsFromText(pdf: any): Promise<TocItem[]> {
       const body = median(heights);
       const heads = spans
         .filter((i, idx) => (heights[idx] ?? 0) > body * 1.25 && i.str.trim().length > 2 && i.str.trim().length < 90)
+        .map((i) => String(i.str).trim());
       const label = heads[0];
       if (label) out.push({ label, level: 0, page: p });
     } catch {
