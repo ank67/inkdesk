@@ -30,7 +30,7 @@ export function UploadZone({ compact = false }: { compact?: boolean }) {
         ref={inputRef}
         type="file"
         multiple
-        accept=".pdf,.docx,.pptx,.epub,.txt"
+        accept=".pdf,.docx,.pptx,.txt,.md"
         className="sr-only"
         onChange={(e) => void handle(e.target.files)}
       />
@@ -42,7 +42,7 @@ export function UploadZone({ compact = false }: { compact?: boolean }) {
         <span className="text-sm font-medium">Add documents</span>
         {!compact && (
           <span className="text-xs text-muted-foreground">
-            Drop PDF, DOCX, PPTX, EPUB or TXT — stored offline on this device
+            Drop PDF, DOCX, PPTX or TXT — stored offline on this device
           </span>
         )}
       </button>

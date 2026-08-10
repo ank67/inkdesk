@@ -1,6 +1,6 @@
 import Dexie, { type Table } from "dexie";
 
-export type DocFormat = "pdf" | "docx" | "pptx" | "epub" | "txt";
+export type DocFormat = "pdf" | "docx" | "pptx" | "txt";
 
 export interface TocItem {
   label: string;
@@ -74,8 +74,8 @@ const EXT_MAP: Record<string, DocFormat> = {
   pdf: "pdf",
   docx: "docx",
   pptx: "pptx",
-  epub: "epub",
   txt: "txt",
+  md: "txt",
 };
 
 export function detectFormat(name: string): DocFormat | null {

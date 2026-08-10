@@ -1,14 +1,13 @@
-import { useState } from "react";
-import { Check, Moon, Palette, Sun, User } from "lucide-react";
+import { Check, Moon, Palette, Sun } from "lucide-react";
 import { THEMES, useTheme, type ThemeName } from "@/lib/theme";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 
 const SWATCH: Record<ThemeName, string> = {
   slate: "bg-linear-to-br from-slate-600 to-cyan-400",
@@ -17,12 +16,11 @@ const SWATCH: Record<ThemeName, string> = {
 };
 
 export function ThemeControls() {
-  const { theme, mode, setTheme, toggleMode } = useTheme();
-  const [open, setOpen] = useState(false);
+  const { theme, mode, setTheme, setMode } = useTheme();
 
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="Change theme"
           className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -30,7 +28,7 @@ export function ThemeControls() {
           <Palette className="size-4.5" aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Theme</DropdownMenuLabel>
+          <DropdownMenuLabel>Visual theme</DropdownMenuLabel>
           {THEMES.map((t) => (
             <DropdownMenuItem key={t.id} onClick={() => setTheme(t.id)}>
               <span className={`size-4 rounded-full ${SWATCH[t.id]}`} aria-hidden="true" />
@@ -41,30 +39,22 @@ export function ThemeControls() {
               {theme === t.id && <Check className="size-4" aria-hidden="true" />}
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={toggleMode}>
-            {mode === "dark" ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
-            Switch to {mode === "dark" ? "light" : "dark"}
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <button
-        onClick={toggleMode}
-        aria-label={`Switch to ${mode === "dark" ? "light" : "dark"} mode`}
-        className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        {mode === "dark" ? <Sun className="size-4.5" aria-hidden="true" /> : <Moon className="size-4.5" aria-hidden="true" />}
-      </button>
-
-      <button
-        aria-label="Profile"
-        className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        <span className="grid size-8 place-items-center rounded-full bg-secondary">
-          <User className="size-4" aria-hidden="true" />
-        </span>
-      </button>
+      <label className="flex min-h-11 items-center gap-1.5 rounded-lg px-1.5 text-muted-foreground">
+        <span className="sr-only">Dark mode</span>
+        {mode === "dark" ? (
+          <Moon className="size-4" aria-hidden="true" />
+        ) : (
+          <Sun className="size-4" aria-hidden="true" />
+        )}
+        <Switch
+          checked={mode === "dark"}
+          onCheckedChange={(v) => setMode(v ? "dark" : "light")}
+          aria-label="Toggle dark mode"
+        />
+      </label>
     </div>
   );
 }

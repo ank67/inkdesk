@@ -1,7 +1,7 @@
 {
   "name": "E-Book — offline document reader",
   "short_name": "E-Book",
-  "description": "Read, annotate and search PDF, DOCX, PPTX, EPUB and TXT documents fully offline.",
+  "description": "Read, annotate and search PDF, DOCX, PPTX and TXT documents fully offline.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
