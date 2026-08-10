@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Archive, FileText, MoreVertical, Presentation, Trash2, BookOpen } from "lucide-react";
+import { Archive, FileText, MoreVertical, Presentation, Trash2 } from "lucide-react";
 import { deleteDoc, formatBytes, toggleArchive, type DocRecord } from "@/lib/db";
 import {
   DropdownMenu,
@@ -12,13 +12,11 @@ const FORMAT_STYLE: Record<string, string> = {
   pdf: "bg-destructive/15 text-destructive",
   docx: "bg-primary/20 text-primary",
   pptx: "bg-accent/20 text-accent",
-  epub: "bg-chart-5/20 text-chart-5",
   txt: "bg-muted text-muted-foreground",
 };
 
 function Icon({ format }: { format: string }) {
   if (format === "pptx") return <Presentation className="size-7" aria-hidden="true" />;
-  if (format === "epub") return <BookOpen className="size-7" aria-hidden="true" />;
   return <FileText className="size-7" aria-hidden="true" />;
 }
 
