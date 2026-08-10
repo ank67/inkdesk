@@ -1,23 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowLeft,
+  Bookmark,
   ChevronLeft,
   ChevronRight,
   Highlighter,
   ListTree,
   Maximize2,
-  Minus,
+  Minimize2,
   Pause,
   Play,
-  Plus,
+  Square,
   StickyNote,
 } from "lucide-react";
+import { toast } from "sonner";
 import { db, type TocItem } from "@/lib/db";
 import { PdfView } from "@/components/reader/PdfView";
 import { DocxView } from "@/components/reader/DocxView";
+import { PptxView } from "@/components/reader/PptxView";
 import { TocDrawer } from "@/components/reader/TocDrawer";
+import { ZoomPane } from "@/components/reader/ZoomPane";
 
 export const Route = createFileRoute("/reader/$docId")({
   head: () => ({
@@ -25,10 +29,10 @@ export const Route = createFileRoute("/reader/$docId")({
       { title: "Reading — E-Book" },
       {
         name: "description",
-        content: "Distraction-free offline reading with a real table of contents, annotations and text-to-speech.",
+        content: "Distraction-free offline reading with a real table of contents, annotations and read-aloud.",
       },
       { property: "og:title", content: "Reading — E-Book" },
-      { property: "og:description", content: "Distraction-free offline reading view for PDF, DOCX, EPUB and TXT." },
+      { property: "og:description", content: "Distraction-free offline reading view for PDF, DOCX, PPTX and TXT." },
       { property: "og:type", content: "article" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -36,19 +40,23 @@ export const Route = createFileRoute("/reader/$docId")({
   component: ReaderPage,
 });
 
+const RATES = [0.75, 1, 1.25, 1.5, 2];
+
 function ReaderPage() {
   const { docId } = Route.useParams();
   const id = Number(docId);
   const doc = useLiveQuery(() => db.docs.get(id), [id]);
-  const [zoom, setZoom] = useState(1);
+
   const [tocOpen, setTocOpen] = useState(false);
+  const [immersive, setImmersive] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [url, setUrl] = useState<string | null>(null);
+  const [rate, setRate] = useState(1);
   const [text, setText] = useState("");
   const [toc, setToc] = useState<TocItem[]>([]);
   const [tocLoading, setTocLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(0);
+  const textRef = useRef("");
 
   const blob = doc?.blob;
   const format = doc?.format;
@@ -56,13 +64,14 @@ function ReaderPage() {
   useEffect(() => {
     if (!doc) return;
     setPage(doc.page || 1);
-    const objectUrl = URL.createObjectURL(doc.blob);
-    setUrl(objectUrl);
     if (doc.format === "txt") void doc.blob.text().then(setText);
     void db.docs.update(id, { lastOpenedAt: Date.now() });
-    return () => URL.revokeObjectURL(objectUrl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.id]);
+
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
 
   // Persist reading position.
   useEffect(() => {
@@ -74,9 +83,8 @@ function ReaderPage() {
   // TXT files get a lightweight heading-based TOC.
   useEffect(() => {
     if (format !== "txt") return;
-    const lines = text.split("\n");
     const items: TocItem[] = [];
-    lines.forEach((line, i) => {
+    text.split("\n").forEach((line, i) => {
       const t = line.trim();
       if (t.length > 2 && t.length < 80 && (t === t.toUpperCase() || /^(chapter|part|\d+[.)])/i.test(t))) {
         items.push({ label: t, level: 0, anchor: `txt-${i}` });
@@ -87,9 +95,35 @@ function ReaderPage() {
   }, [format, text]);
 
   useEffect(() => {
-    if (format === "pdf" || format === "docx") setTocLoading(true);
-    else if (format && format !== "txt") setTocLoading(false);
+    if (format && format !== "txt") setTocLoading(true);
   }, [format]);
+
+  // Stop speech when leaving the reader.
+  useEffect(() => {
+    return () => {
+      if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
+    };
+  }, []);
+
+  // Escape leaves distraction-free mode.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImmersive(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const enterImmersive = useCallback(() => {
+    setTocOpen(false);
+    setImmersive(true);
+    void document.documentElement.requestFullscreen?.().catch(() => {});
+  }, []);
+
+  const exitImmersive = useCallback(() => {
+    setImmersive(false);
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+  }, []);
 
   const onSelect = (item: TocItem) => {
     if (item.page !== undefined) setPage(item.page);
@@ -97,20 +131,123 @@ function ReaderPage() {
     if (window.innerWidth < 768) setTocOpen(false);
   };
 
-  const speakable = useMemo(() => text || doc?.title || "", [text, doc?.title]);
-
-  const speak = () => {
-    if (typeof speechSynthesis === "undefined") return;
-    if (speaking) {
-      speechSynthesis.cancel();
-      setSpeaking(false);
+  const speak = (nextRate = rate) => {
+    if (typeof speechSynthesis === "undefined") {
+      toast.error("Read aloud isn't supported in this browser.");
       return;
     }
-    const utter = new SpeechSynthesisUtterance(speakable);
+    const body = textRef.current || doc?.title || "";
+    if (!body.trim()) {
+      toast.error("No readable text found in this document yet.");
+      return;
+    }
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(body.slice(0, 30000));
+    utter.rate = nextRate;
     utter.onend = () => setSpeaking(false);
     speechSynthesis.speak(utter);
     setSpeaking(true);
   };
+
+  const togglePlay = () => {
+    if (typeof speechSynthesis === "undefined") return;
+    if (speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause();
+      setSpeaking(false);
+      return;
+    }
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      setSpeaking(true);
+      return;
+    }
+    speak();
+  };
+
+  const stop = () => {
+    if (typeof speechSynthesis === "undefined") return;
+    speechSynthesis.cancel();
+    setSpeaking(false);
+  };
+
+  const changeRate = () => {
+    const next = RATES[(RATES.indexOf(rate) + 1) % RATES.length]!;
+    setRate(next);
+    if (speaking) speak(next);
+  };
+
+  const addBookmark = async () => {
+    await db.bookmarks.add({ docId: id, page, label: `Page ${page}`, createdAt: Date.now() });
+    toast.success(`Bookmarked page ${page}`);
+  };
+
+  const content = (
+    <>
+      {format === "pdf" && blob ? (
+        <PdfView
+          blob={blob}
+          page={page}
+          zoom={1.5}
+          onLoaded={({ pageCount, toc, text }) => {
+            setPageCount(pageCount);
+            setToc(toc);
+            setText(text);
+            setTocLoading(false);
+            void db.docs.update(id, { pageCount, toc, textIndex: text.slice(0, 20000) });
+          }}
+        />
+      ) : format === "docx" && blob ? (
+        <DocxView
+          blob={blob}
+          zoom={1}
+          onLoaded={({ toc, text }) => {
+            setToc(toc);
+            setText(text);
+            setTocLoading(false);
+            void db.docs.update(id, { toc, textIndex: text.slice(0, 20000) });
+          }}
+        />
+      ) : format === "pptx" && blob ? (
+        <PptxView
+          blob={blob}
+          onLoaded={({ toc, text, slideCount }) => {
+            setToc(toc);
+            setText(text);
+            setPageCount(slideCount);
+            setTocLoading(false);
+            void db.docs.update(id, { pageCount: slideCount, toc, textIndex: text.slice(0, 20000) });
+          }}
+        />
+      ) : format === "txt" ? (
+        <article className="mx-auto max-w-3xl whitespace-pre-wrap rounded-xl border border-border bg-card p-6 leading-7">
+          {text.split("\n").map((line, i) => (
+            <p key={i} id={`txt-${i}`}>
+              {line || "\u00a0"}
+            </p>
+          ))}
+        </article>
+      ) : (
+        <div className="grid h-[60vh] w-[80vw] max-w-3xl place-items-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+          Loading document…
+        </div>
+      )}
+    </>
+  );
+
+  if (immersive) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <ZoomPane className="min-h-screen overflow-auto p-2">{content}</ZoomPane>
+        <button
+          onClick={exitImmersive}
+          aria-label="Exit distraction-free mode"
+          className="fixed bottom-4 right-4 z-40 grid size-11 place-items-center rounded-full bg-card/70 text-muted-foreground opacity-40 backdrop-blur transition-opacity hover:opacity-100"
+        >
+          <Minimize2 className="size-4.5" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -122,7 +259,7 @@ function ReaderPage() {
         >
           <ArrowLeft className="size-4.5" aria-hidden="true" />
         </Link>
-        <h1 className="min-w-0 truncate text-sm font-medium">{doc?.title ?? "Loading…"}</h1>
+        <h1 className="min-w-0 truncate text-center text-sm font-medium">{doc?.title ?? "Loading…"}</h1>
         <button
           onClick={() => setTocOpen((v) => !v)}
           aria-label="Toggle table of contents"
@@ -145,90 +282,41 @@ function ReaderPage() {
           onClose={() => setTocOpen(false)}
         />
 
-        <main className="relative flex-1 overflow-auto p-3">
-          <div className="mx-auto max-w-5xl">
-            {format === "pdf" && blob ? (
-              <PdfView
-                blob={blob}
-                page={page}
-                zoom={zoom}
-                onLoaded={({ pageCount, toc, text }) => {
-                  setPageCount(pageCount);
-                  setToc(toc);
-                  setText(text);
-                  setTocLoading(false);
-                  void db.docs.update(id, { pageCount, toc, textIndex: text.slice(0, 20000) });
-                }}
-              />
-            ) : format === "docx" && blob ? (
-              <DocxView
-                blob={blob}
-                zoom={zoom}
-                onLoaded={({ toc, text }) => {
-                  setToc(toc);
-                  setText(text);
-                  setTocLoading(false);
-                  void db.docs.update(id, { toc, textIndex: text.slice(0, 20000) });
-                }}
-              />
-            ) : format === "txt" ? (
-              <article
-                className="whitespace-pre-wrap rounded-xl border border-border bg-card p-6 leading-7"
-                style={{ fontSize: `${0.875 * zoom}rem` }}
-              >
-                {text.split("\n").map((line, i) => (
-                  <p key={i} id={`txt-${i}`}>
-                    {line || "\u00a0"}
-                  </p>
-                ))}
-              </article>
-            ) : url && doc ? (
-              <div className="grid h-[70vh] place-items-center rounded-xl border border-dashed border-border text-center text-sm text-muted-foreground">
-                <p>{doc.format.toUpperCase()} rendering comes next</p>
-              </div>
-            ) : (
-              <div className="grid h-[60vh] place-items-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
-                Loading document…
-              </div>
-            )}
-          </div>
+        <main className="relative flex-1 overflow-hidden">
+          <ZoomPane className="h-[calc(100vh-7.5rem)] overflow-auto p-3">{content}</ZoomPane>
 
-          <div className="pointer-events-auto absolute right-4 top-6 flex flex-col gap-2 rounded-xl border border-border bg-card/90 p-1.5 shadow-[var(--shadow-float)] backdrop-blur">
+          <div className="absolute right-4 top-4 flex flex-col gap-2 rounded-xl border border-border bg-card/90 p-1.5 shadow-[var(--shadow-float)] backdrop-blur">
             <button
               aria-label="Highlight text"
+              onClick={() => toast("Select text, then highlight — coming to your annotations soon.")}
               className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-highlight"
             >
               <Highlighter className="size-4.5" aria-hidden="true" />
             </button>
             <button
               aria-label="Add sticky note"
+              onClick={async () => {
+                await db.annotations.add({ docId: id, page, kind: "note", text: "", createdAt: Date.now() });
+                toast.success("Sticky note added to this page");
+              }}
               className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-accent"
             >
               <StickyNote className="size-4.5" aria-hidden="true" />
+            </button>
+            <button
+              aria-label="Bookmark this page"
+              onClick={() => void addBookmark()}
+              className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-primary"
+            >
+              <Bookmark className="size-4.5" aria-hidden="true" />
             </button>
           </div>
         </main>
       </div>
 
       <footer className="sticky bottom-0 z-20 flex items-center gap-2 border-t border-border bg-background/90 px-3 py-2 backdrop-blur-xl">
-        <button
-          onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.1).toFixed(2)))}
-          aria-label="Zoom out"
-          className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
-        >
-          <Minus className="size-4.5" aria-hidden="true" />
-        </button>
-        <span className="w-12 text-center text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
-        <button
-          onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))}
-          aria-label="Zoom in"
-          className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
-        >
-          <Plus className="size-4.5" aria-hidden="true" />
-        </button>
-
         {format === "pdf" && pageCount > 0 && (
-          <div className="ml-2 flex items-center gap-1">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
@@ -251,20 +339,36 @@ function ReaderPage() {
           </div>
         )}
 
-        <button
-          onClick={speak}
-          className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-lg bg-linear-to-r from-primary to-accent px-4 text-sm font-medium text-primary-foreground"
-        >
-          {speaking ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-          Listen
-        </button>
-        <button
-          onClick={() => void document.documentElement.requestFullscreen?.()}
-          aria-label="Fullscreen"
-          className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
-        >
-          <Maximize2 className="size-4.5" aria-hidden="true" />
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            onClick={togglePlay}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-linear-to-r from-primary to-accent px-4 text-sm font-medium text-primary-foreground"
+          >
+            {speaking ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
+            Listen
+          </button>
+          <button
+            onClick={stop}
+            aria-label="Stop reading aloud"
+            className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <Square className="size-4" aria-hidden="true" />
+          </button>
+          <button
+            onClick={changeRate}
+            aria-label={`Reading speed ${rate}x`}
+            className="min-h-11 rounded-lg px-2 text-xs font-semibold tabular-nums text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            {rate}x
+          </button>
+          <button
+            onClick={enterImmersive}
+            aria-label="Distraction-free fullscreen"
+            className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <Maximize2 className="size-4.5" aria-hidden="true" />
+          </button>
+        </div>
       </footer>
     </div>
   );
