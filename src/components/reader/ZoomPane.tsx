@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type TouchList } from "react";
 
 const MIN = 0.6;
 const MAX = 4;

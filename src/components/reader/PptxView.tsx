@@ -104,8 +104,7 @@ export function PptxView({ blob, onLoaded }: Props) {
             if (paras.length) shapes.push({ kind: "text", ...frame, paras });
           }
 
-          const title = shapes.find((s) => s.kind === "text")?.kind === "text" ? plain(shapes) : `Slide ${out.length + 1}`;
-          out.push({ shapes, title });
+          out.push({ shapes, title: plain(shapes) || `Slide ${out.length + 1}` });
         }
 
         if (cancelled) {
