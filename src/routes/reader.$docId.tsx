@@ -12,6 +12,7 @@ import {
   Minimize2,
   Pause,
   Play,
+  Sparkles,
   Square,
   StickyNote,
 } from "lucide-react";
@@ -22,6 +23,8 @@ import { DocxView } from "@/components/reader/DocxView";
 import { PptxView } from "@/components/reader/PptxView";
 import { TocDrawer } from "@/components/reader/TocDrawer";
 import { ZoomPane } from "@/components/reader/ZoomPane";
+import { DocChat } from "@/components/reader/DocChat";
+
 
 export const Route = createFileRoute("/reader/$docId")({
   head: () => ({
@@ -49,7 +52,9 @@ function ReaderPage() {
 
   const [tocOpen, setTocOpen] = useState(false);
   const [immersive, setImmersive] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+
   const [rate, setRate] = useState(1);
   const [text, setText] = useState("");
   const [toc, setToc] = useState<TocItem[]>([]);
@@ -310,6 +315,15 @@ function ReaderPage() {
             >
               <Bookmark className="size-4.5" aria-hidden="true" />
             </button>
+            <button
+              aria-label="Ask about this document"
+              aria-pressed={chatOpen}
+              onClick={() => setChatOpen((v) => !v)}
+              className={`grid min-h-11 min-w-11 place-items-center rounded-lg transition-colors ${chatOpen ? "bg-secondary text-accent" : "text-muted-foreground hover:bg-secondary hover:text-accent"}`}
+            >
+              <Sparkles className="size-4.5" aria-hidden="true" />
+            </button>
+
           </div>
         </main>
       </div>
@@ -370,6 +384,14 @@ function ReaderPage() {
           </button>
         </div>
       </footer>
+
+      <DocChat
+        title={doc?.title ?? "Document"}
+        context={(text || doc?.textIndex || "").slice(0, 12000)}
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
+
     </div>
   );
 }

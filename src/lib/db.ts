@@ -21,10 +21,18 @@ export interface DocRecord {
   pageCount?: number;
   tags: string[];
   archived: 0 | 1;
+  starred?: 0 | 1;
+  thumb?: string;
+  summary?: string[];
   textIndex?: string;
   toc?: TocItem[];
 }
 
+export interface TagRecord {
+  id?: number;
+  name: string;
+  color: string;
+}
 
 export interface Annotation {
   id?: number;
@@ -55,6 +63,7 @@ class ReaderDB extends Dexie {
   docs!: Table<DocRecord, number>;
   annotations!: Table<Annotation, number>;
   bookmarks!: Table<Bookmark, number>;
+  tags!: Table<TagRecord, number>;
   settings!: Table<Setting, string>;
 
   constructor() {
@@ -65,10 +74,37 @@ class ReaderDB extends Dexie {
       bookmarks: "++id, docId, page",
       settings: "key",
     });
+    this.version(2)
+      .stores({
+        docs: "++id, title, format, addedAt, lastOpenedAt, archived, starred, *tags",
+        annotations: "++id, docId, page, kind",
+        bookmarks: "++id, docId, page",
+        tags: "++id, &name",
+        settings: "key",
+      })
+      .upgrade((tx) =>
+        tx
+          .table<DocRecord>("docs")
+          .toCollection()
+          .modify((d) => {
+            d.starred = 0;
+          }),
+      );
   }
 }
 
 export const db = new ReaderDB();
+
+export const TAG_COLORS = [
+  { id: "primary", label: "Blue", cls: "bg-primary/20 text-primary border-primary/40" },
+  { id: "accent", label: "Teal", cls: "bg-accent/20 text-accent border-accent/40" },
+  { id: "highlight", label: "Amber", cls: "bg-highlight/20 text-highlight border-highlight/40" },
+  { id: "destructive", label: "Red", cls: "bg-destructive/15 text-destructive border-destructive/40" },
+] as const;
+
+export function tagColorClass(color: string) {
+  return TAG_COLORS.find((c) => c.id === color)?.cls ?? TAG_COLORS[0].cls;
+}
 
 const EXT_MAP: Record<string, DocFormat> = {
   pdf: "pdf",
@@ -97,11 +133,28 @@ export async function addFiles(files: File[]) {
       page: 1,
       tags: [],
       archived: 0,
+      starred: 0,
       textIndex: format === "txt" ? await file.text().catch(() => "") : "",
     });
     added.push(id);
   }
   return added;
+}
+
+export async function addTextDocument(title: string, text: string) {
+  const blob = new Blob([text], { type: "text/plain" });
+  return db.docs.add({
+    title,
+    format: "txt",
+    size: blob.size,
+    blob,
+    addedAt: Date.now(),
+    page: 1,
+    tags: [],
+    archived: 0,
+    starred: 0,
+    textIndex: text,
+  });
 }
 
 export async function deleteDoc(id: number) {
@@ -116,6 +169,24 @@ export async function toggleArchive(id: number) {
   const doc = await db.docs.get(id);
   if (!doc) return;
   await db.docs.update(id, { archived: doc.archived ? 0 : 1 });
+}
+
+export async function toggleStar(id: number) {
+  const doc = await db.docs.get(id);
+  if (!doc) return;
+  await db.docs.update(id, { starred: doc.starred ? 0 : 1 });
+}
+
+export async function setDocTags(id: number, tags: string[]) {
+  await db.docs.update(id, { tags });
+}
+
+export async function saveThumb(id: number, thumb: string) {
+  await db.docs.update(id, { thumb });
+}
+
+export async function saveSummary(id: number, summary: string[]) {
+  await db.docs.update(id, { summary });
 }
 
 export async function getStorageEstimate() {
@@ -138,4 +209,17 @@ export function formatBytes(bytes: number) {
   const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/** Keeps the extension and version suffix visible: "Super_Pro…v2.pdf". */
+export function middleTruncate(value: string, max = 26) {
+  if (value.length <= max) return value;
+  const head = Math.ceil((max - 1) * 0.6);
+  const tail = max - 1 - head;
+  return `${value.slice(0, head)}…${value.slice(value.length - tail)}`;
+}
+
+export function readingProgress(doc: DocRecord) {
+  if (!doc.pageCount || doc.pageCount < 2) return doc.lastOpenedAt ? 100 : 0;
+  return Math.min(100, Math.round(((doc.page || 1) / doc.pageCount) * 100));
 }
