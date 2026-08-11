@@ -384,6 +384,14 @@ function ReaderPage() {
           </button>
         </div>
       </footer>
+
+      <DocChat
+        title={doc?.title ?? "Document"}
+        context={(text || doc?.textIndex || "").slice(0, 12000)}
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+      />
+
     </div>
   );
 }
