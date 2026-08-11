@@ -12,6 +12,7 @@ import {
   Minimize2,
   Pause,
   Play,
+  Sparkles,
   Square,
   StickyNote,
 } from "lucide-react";
@@ -22,6 +23,8 @@ import { DocxView } from "@/components/reader/DocxView";
 import { PptxView } from "@/components/reader/PptxView";
 import { TocDrawer } from "@/components/reader/TocDrawer";
 import { ZoomPane } from "@/components/reader/ZoomPane";
+import { DocChat } from "@/components/reader/DocChat";
+
 
 export const Route = createFileRoute("/reader/$docId")({
   head: () => ({
