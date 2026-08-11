@@ -52,7 +52,9 @@ function ReaderPage() {
 
   const [tocOpen, setTocOpen] = useState(false);
   const [immersive, setImmersive] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+
   const [rate, setRate] = useState(1);
   const [text, setText] = useState("");
   const [toc, setToc] = useState<TocItem[]>([]);
