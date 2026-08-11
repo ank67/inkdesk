@@ -1,10 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Grid2x2, List, Search } from "lucide-react";
-import { db, type DocRecord } from "@/lib/db";
+import { Clock, Grid2x2, HardDrive, List, ScanText, Search, Star, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { db, deleteDoc, tagColorClass, toggleStar, type DocRecord } from "@/lib/db";
 import { DocCard } from "@/components/library/DocCard";
 import { UploadZone } from "@/components/library/UploadZone";
+import { EmptyState } from "@/components/library/EmptyState";
+import { ScanDialog } from "@/components/library/ScanDialog";
 import { TopBar } from "@/components/layout/TopBar";
 
 export const Route = createFileRoute("/")({
@@ -38,21 +41,53 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+type ChipId = "recent" | "starred" | "large";
+
+const CHIPS: { id: ChipId; label: string; icon: typeof Clock }[] = [
+  { id: "recent", label: "Recent", icon: Clock },
+  { id: "starred", label: "Starred", icon: Star },
+  { id: "large", label: "Large files", icon: HardDrive },
+];
+
+const LARGE = 5 * 1024 * 1024;
+const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 function LibraryPage() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [tab, setTab] = useState<TabId>("all");
   const [query, setQuery] = useState("");
+  const [chips, setChips] = useState<ChipId[]>([]);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const docs = useLiveQuery(() => db.docs.orderBy("addedAt").reverse().toArray(), [], [] as DocRecord[]);
+  const tags = useLiveQuery(() => db.tags.toArray(), [], []);
+
+  const toggleChip = (id: ChipId) => setChips((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return (docs ?? []).filter((d) => {
-      if (tab === "archive") return d.archived === 1 && matches(d, q);
-      return d.archived === 0 && (tab === "all" || d.format === tab) && matches(d, q);
+    const now = Date.now();
+    let list = (docs ?? []).filter((d) => {
+      if (tab === "archive") return d.archived === 1;
+      return d.archived === 0 && (tab === "all" || d.format === tab);
     });
-  }, [docs, tab, query]);
+    if (activeTag) list = list.filter((d) => d.tags.includes(activeTag));
+    if (chips.includes("starred")) list = list.filter((d) => d.starred === 1);
+    if (chips.includes("large")) list = list.filter((d) => d.size >= LARGE);
+    if (chips.includes("recent")) {
+      list = list
+        .filter((d) => (d.lastOpenedAt ?? d.addedAt) > now - WEEK)
+        .sort((a, b) => (b.lastOpenedAt ?? b.addedAt) - (a.lastOpenedAt ?? a.addedAt));
+    }
+    return list.filter((d) => matches(d, q));
+  }, [docs, tab, query, chips, activeTag]);
+
+  const selectionMode = selected.length > 0;
+  const toggleSelect = (id: number) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  const emptyTab = activeTag ? "tag" : chips.includes("starred") ? "starred" : tab;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -70,9 +105,25 @@ function LibraryPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search your library…"
               aria-label="Search library"
-              className="h-10 w-full rounded-xl border border-border bg-card/60 pl-9 pr-3 text-sm outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/40"
+              className="h-11 w-full rounded-xl border border-border bg-card/60 pl-9 pr-3 text-sm outline-hidden placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/40"
             />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground hover:bg-secondary"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            )}
           </div>
+          <button
+            onClick={() => setScanOpen(true)}
+            aria-label="Scan a page with the camera"
+            className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <ScanText className="size-4.5" aria-hidden="true" />
+          </button>
           <button
             aria-label="Grid view"
             aria-pressed={view === "grid"}
@@ -89,6 +140,40 @@ function LibraryPage() {
           >
             <List className="size-4.5" aria-hidden="true" />
           </button>
+        </div>
+
+        <div className="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2">
+          {CHIPS.map((c) => {
+            const on = chips.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                onClick={() => toggleChip(c.id)}
+                aria-pressed={on}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                  on ? "border-accent/50 bg-accent/15 text-accent" : "border-border text-muted-foreground"
+                }`}
+              >
+                <c.icon className="size-3.5" aria-hidden="true" />
+                {c.label}
+              </button>
+            );
+          })}
+          {(tags ?? []).map((t) => {
+            const on = activeTag === t.name;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTag(on ? null : t.name)}
+                aria-pressed={on}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                  on ? tagColorClass(t.color) : "border-border text-muted-foreground"
+                }`}
+              >
+                #{t.name}
+              </button>
+            );
+          })}
         </div>
 
         <nav aria-label="Filter by category" className="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2">
@@ -112,36 +197,96 @@ function LibraryPage() {
       <main className="mx-auto max-w-7xl px-3 py-5">
         <UploadZone />
 
-        <h2 className="mb-3 mt-5 text-sm font-semibold text-muted-foreground">
-          {visible.length} {visible.length === 1 ? "document" : "documents"}
-        </h2>
+        <div className="mb-3 mt-5 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            {visible.length} {visible.length === 1 ? "document" : "documents"}
+          </h2>
+          {!selectionMode && visible.length > 0 && (
+            <button
+              onClick={() => setSelected([visible[0]!.id!])}
+              className="ml-auto text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              Select
+            </button>
+          )}
+        </div>
 
         {visible.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-            <p className="text-sm font-medium">Nothing here yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Add a PDF, DOCX, PPTX or TXT file to start your offline library.
-            </p>
-          </div>
+          <EmptyState tab={emptyTab} query={query} />
         ) : view === "grid" ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
             {visible.map((d) => (
-              <DocCard key={d.id} doc={d} view="grid" />
+              <DocCard
+                key={d.id}
+                doc={d}
+                view="grid"
+                tags={tags ?? []}
+                selectionMode={selectionMode}
+                selected={selected.includes(d.id!)}
+                onToggleSelect={toggleSelect}
+              />
             ))}
           </div>
         ) : (
           <div className="flex flex-col gap-2">
             {visible.map((d) => (
-              <DocCard key={d.id} doc={d} view="list" />
+              <DocCard
+                key={d.id}
+                doc={d}
+                view="list"
+                tags={tags ?? []}
+                selectionMode={selectionMode}
+                selected={selected.includes(d.id!)}
+                onToggleSelect={toggleSelect}
+              />
             ))}
           </div>
         )}
       </main>
+
+      {selectionMode && (
+        <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 animate-scale-in items-center gap-2 rounded-2xl border border-border bg-card/95 px-3 py-2 shadow-[var(--shadow-float)] backdrop-blur-xl">
+          <span className="text-xs font-medium tabular-nums">{selected.length} selected</span>
+          <button
+            onClick={() => {
+              selected.forEach((id) => void toggleStar(id));
+              toast.success("Starred selection");
+              setSelected([]);
+            }}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-highlight hover:bg-secondary"
+          >
+            <Star className="size-3.5" aria-hidden="true" /> Star
+          </button>
+          <button
+            onClick={() => {
+              selected.forEach((id) => void deleteDoc(id));
+              toast.success(`Deleted ${selected.length} documents`);
+              setSelected([]);
+            }}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-destructive hover:bg-secondary"
+          >
+            <Trash2 className="size-3.5" aria-hidden="true" /> Delete
+          </button>
+          <button
+            onClick={() => setSelected([])}
+            aria-label="Cancel selection"
+            className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-secondary"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
     </div>
   );
 }
 
 function matches(doc: DocRecord, q: string) {
   if (!q) return true;
-  return doc.title.toLowerCase().includes(q) || (doc.textIndex ?? "").toLowerCase().includes(q);
+  return (
+    doc.title.toLowerCase().includes(q) ||
+    (doc.textIndex ?? "").toLowerCase().includes(q) ||
+    doc.tags.some((t) => t.toLowerCase().includes(q))
+  );
 }
