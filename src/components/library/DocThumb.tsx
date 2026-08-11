@@ -43,7 +43,7 @@ export function DocThumb({ doc, className = "" }: { doc: DocRecord; className?: 
         if (!ctx) return;
         await page.render({ canvas, canvasContext: ctx, viewport }).promise;
         const url = canvas.toDataURL("image/jpeg", 0.7);
-        void pdf.destroy();
+        void (pdf as unknown as { destroy: () => Promise<void> }).destroy();
         if (cancelled) return;
         setThumb(url);
         if (doc.id) void saveThumb(doc.id, url);
@@ -73,7 +73,7 @@ export function DocThumb({ doc, className = "" }: { doc: DocRecord; className?: 
 
   return (
     <div
-      className={`relative overflow-hidden bg-linear-to-br ${COVER[doc.format] ?? COVER.txt} ${className}`}
+      className={`relative overflow-hidden bg-linear-to-br ${COVER[doc.format] ?? COVER["txt"]} ${className}`}
       aria-hidden="true"
     >
       {doc.format === "txt" && txtPeek ? (
