@@ -315,6 +315,15 @@ function ReaderPage() {
             >
               <Bookmark className="size-4.5" aria-hidden="true" />
             </button>
+            <button
+              aria-label="Ask about this document"
+              aria-pressed={chatOpen}
+              onClick={() => setChatOpen((v) => !v)}
+              className={`grid min-h-11 min-w-11 place-items-center rounded-lg transition-colors ${chatOpen ? "bg-secondary text-accent" : "text-muted-foreground hover:bg-secondary hover:text-accent"}`}
+            >
+              <Sparkles className="size-4.5" aria-hidden="true" />
+            </button>
+
           </div>
         </main>
       </div>
