@@ -192,13 +192,15 @@ function ReaderPage() {
         <PdfView
           blob={blob}
           page={page}
-          zoom={1.5}
-          onLoaded={({ pageCount, toc, text }) => {
+          onLoaded={({ pageCount }) => {
             setPageCount(pageCount);
+            void db.docs.update(id, { pageCount });
+          }}
+          onMeta={({ toc, text }) => {
             setToc(toc);
             setText(text);
             setTocLoading(false);
-            void db.docs.update(id, { pageCount, toc, textIndex: text.slice(0, 20000) });
+            void db.docs.update(id, { toc, textIndex: text.slice(0, 20000) });
           }}
         />
       ) : format === "docx" && blob ? (
