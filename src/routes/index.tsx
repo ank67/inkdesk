@@ -59,8 +59,6 @@ function LibraryPage() {
   const tags = useLiveQuery(() => db.tags.toArray(), [], []);
 
 
-  const toggleChip = (id: ChipId) => setChips((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
-
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     const now = Date.now();
