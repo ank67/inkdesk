@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { LogIn, LogOut, User } from "lucide-react";
+import { BarChart3, LogIn, LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { ReadingStats } from "@/components/layout/ReadingStats";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ export function AuthButton() {
   const [email, setEmail] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     const read = (user: { email?: string | null; user_metadata?: Record<string, unknown> } | null) => {
