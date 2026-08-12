@@ -99,6 +99,9 @@ class ReaderDB extends Dexie {
             d.starred = 0;
           }),
       );
+    this.version(3).stores({
+      sessions: "++id, docId, day, [docId+day]",
+    });
   }
 }
 
