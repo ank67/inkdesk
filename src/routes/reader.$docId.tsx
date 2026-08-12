@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { db, type TocItem } from "@/lib/db";
+import { addReadingTime } from "@/lib/reading-stats";
 import { PdfView } from "@/components/reader/PdfView";
 import { DocxView } from "@/components/reader/DocxView";
 import { PptxView } from "@/components/reader/PptxView";
