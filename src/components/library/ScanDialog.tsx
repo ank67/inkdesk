@@ -16,13 +16,10 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     setBusy(true);
     setText("");
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("Could not read that image."));
-        reader.readAsDataURL(file);
-      });
-      setPreview(dataUrl);
+      const objectUrl = URL.createObjectURL(file);
+      setPreview(objectUrl);
+      // Downscale before upload: OCR quality is unchanged but the request is far smaller/faster.
+      const dataUrl = await downscale(file);
       const { text: extracted } = await extractTextFromImage({ data: { dataUrl } });
       if (!extracted.trim()) {
         toast.error("No text found in that image.");
@@ -36,6 +33,7 @@ export function ScanDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       setBusy(false);
     }
   };
+
 
   const save = async () => {
     await addTextDocument(title, text);
