@@ -103,12 +103,49 @@ function ReaderPage() {
     if (format && format !== "txt") setTocLoading(true);
   }, [format]);
 
+  // Active reading time: only ticks while this document is on screen, the tab is
+  // visible and the reader has interacted in the last 2 minutes. Sign-in and
+  // background time never count.
+  useEffect(() => {
+    if (!Number.isFinite(id)) return;
+    let pending = 0;
+    let lastActive = Date.now();
+    const touch = () => {
+      lastActive = Date.now();
+    };
+    const events = ["pointerdown", "keydown", "wheel", "touchstart", "scroll", "mousemove"] as const;
+    events.forEach((e) => window.addEventListener(e, touch, { passive: true }));
+
+    const flush = () => {
+      if (pending >= 1) {
+        void addReadingTime(id, pending);
+        pending = 0;
+      }
+    };
+
+    const tick = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastActive > 120000) return;
+      pending += 5;
+      if (pending >= 30) flush();
+    }, 5000);
+
+    document.addEventListener("visibilitychange", flush);
+    return () => {
+      window.clearInterval(tick);
+      events.forEach((e) => window.removeEventListener(e, touch));
+      document.removeEventListener("visibilitychange", flush);
+      flush();
+    };
+  }, [id]);
+
   // Stop speech when leaving the reader.
   useEffect(() => {
     return () => {
       if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
     };
   }, []);
+
 
   // Escape leaves distraction-free mode.
   useEffect(() => {
