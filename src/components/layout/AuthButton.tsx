@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { LogIn, LogOut, User } from "lucide-react";
+import { BarChart3, LogIn, LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { ReadingStats } from "@/components/layout/ReadingStats";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ export function AuthButton() {
   const [email, setEmail] = useState<string | null>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   useEffect(() => {
     const read = (user: { email?: string | null; user_metadata?: Record<string, unknown> } | null) => {
@@ -51,35 +53,43 @@ export function AuthButton() {
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        aria-label={email ? `Account: ${email}` : "Sign in"}
-        className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-      >
-        {avatar ? (
-          <img src={avatar} alt="" className="size-8 rounded-full object-cover" />
-        ) : (
-          <span className="grid size-8 place-items-center rounded-full bg-secondary">
-            <User className="size-4" aria-hidden="true" />
-          </span>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel className="truncate">{email ?? "Not signed in"}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {email ? (
-          <DropdownMenuItem onClick={() => void signOut()}>
-            <LogOut className="size-4" aria-hidden="true" /> Sign out
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label={email ? `Account: ${email}` : "Sign in"}
+          className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          {avatar ? (
+            <img src={avatar} alt="" className="size-8 rounded-full object-cover" />
+          ) : (
+            <span className="grid size-8 place-items-center rounded-full bg-secondary">
+              <User className="size-4" aria-hidden="true" />
+            </span>
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuLabel className="truncate">{email ?? "Not signed in"}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setStatsOpen(true)}>
+            <BarChart3 className="size-4" aria-hidden="true" /> Reading analytics
           </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem disabled={busy} onClick={() => void signIn()}>
-            <LogIn className="size-4" aria-hidden="true" /> Continue with Google
-          </DropdownMenuItem>
-        )}
-        <p className="px-2 py-1.5 text-xs text-muted-foreground">
-          Your documents always stay on this device. Signing in only syncs library metadata.
-        </p>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {email ? (
+            <DropdownMenuItem onClick={() => void signOut()}>
+              <LogOut className="size-4" aria-hidden="true" /> Sign out
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem disabled={busy} onClick={() => void signIn()}>
+              <LogIn className="size-4" aria-hidden="true" /> Continue with Google
+            </DropdownMenuItem>
+          )}
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">
+            Your documents always stay on this device. Signing in only syncs library metadata.
+          </p>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <ReadingStats open={statsOpen} onOpenChange={setStatsOpen} />
+    </>
   );
 }
+

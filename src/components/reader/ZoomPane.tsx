@@ -1,12 +1,13 @@
 import { useRef, useState, type ReactNode, type TouchList } from "react";
 
-const MIN = 0.6;
+const MIN = 0.5;
 const MAX = 4;
-const clamp = (v: number) => Math.min(MAX, Math.max(MIN, v));
+const clamp = (v: number) => Math.min(MAX, Math.max(MIN, Math.round(v * 100) / 100));
 
 /**
  * Touch-first zoom surface: multi-touch pinch, double-tap toggle and
- * ctrl/cmd + wheel on desktop. No zoom buttons by design.
+ * ctrl/cmd + wheel on desktop. Uses CSS `zoom` so the scaled content
+ * reflows and stays fully scrollable at every level.
  */
 export function ZoomPane({ children, className = "" }: { children: ReactNode; className?: string }) {
   const [scale, setScale] = useState(1);
@@ -20,7 +21,7 @@ export function ZoomPane({ children, className = "" }: { children: ReactNode; cl
 
   return (
     <div
-      className={`touch-pan-y overscroll-contain ${className}`}
+      className={`touch-pan-y touch-pinch-zoom overscroll-contain ${className}`}
       onTouchStart={(e) => {
         if (e.touches.length === 2) {
           pinch.current = { dist: distance(e.touches), scale };
@@ -38,7 +39,6 @@ export function ZoomPane({ children, className = "" }: { children: ReactNode; cl
       }}
       onTouchMove={(e) => {
         if (e.touches.length !== 2 || !pinch.current) return;
-        e.preventDefault();
         const next = (pinch.current.scale * distance(e.touches)) / pinch.current.dist;
         setScale(clamp(next));
       }}
@@ -48,16 +48,18 @@ export function ZoomPane({ children, className = "" }: { children: ReactNode; cl
       onWheel={(e) => {
         if (!e.ctrlKey && !e.metaKey) return;
         e.preventDefault();
-        setScale((s) => clamp(s - e.deltaY * 0.005));
+        setScale((s) => clamp(s - e.deltaY * 0.004));
       }}
       onDoubleClick={() => setScale((s) => (s > 1.05 ? 1 : 2))}
     >
-      <div
-        className="mx-auto w-max origin-top transition-transform duration-100 ease-out will-change-transform"
-        style={{ transform: `scale(${scale})` }}
-      >
+      <div className="w-full" style={{ zoom: scale }}>
         {children}
       </div>
+      {scale !== 1 && (
+        <div className="pointer-events-none sticky bottom-2 left-2 z-10 w-max rounded-full bg-card/90 px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums text-muted-foreground shadow-[var(--shadow-float)] backdrop-blur">
+          {Math.round(scale * 100)}%
+        </div>
+      )}
     </div>
   );
 }

@@ -59,11 +59,20 @@ export interface Setting {
   value: unknown;
 }
 
+/** One row per document per day: active seconds actually spent reading. */
+export interface ReadingSession {
+  id?: number;
+  docId: number;
+  day: string; // YYYY-MM-DD
+  seconds: number;
+}
+
 class ReaderDB extends Dexie {
   docs!: Table<DocRecord, number>;
   annotations!: Table<Annotation, number>;
   bookmarks!: Table<Bookmark, number>;
   tags!: Table<TagRecord, number>;
+  sessions!: Table<ReadingSession, number>;
   settings!: Table<Setting, string>;
 
   constructor() {
@@ -90,6 +99,9 @@ class ReaderDB extends Dexie {
             d.starred = 0;
           }),
       );
+    this.version(3).stores({
+      sessions: "++id, docId, day, [docId+day]",
+    });
   }
 }
 

@@ -4,17 +4,32 @@ import type { TocItem } from "@/lib/db";
 type Props = {
   blob: Blob;
   page: number;
-  zoom: number;
-  onLoaded: (info: { pageCount: number; toc: TocItem[]; text: string }) => void;
+  onLoaded: (info: { pageCount: number }) => void;
+  onMeta?: (info: { toc: TocItem[]; text: string }) => void;
 };
 
 // pdf.js is browser-only, so it is imported lazily inside the effect.
-export function PdfView({ blob, page, zoom, onLoaded }: Props) {
+export function PdfView({ blob, page, onLoaded, onMeta }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const docRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [width, setWidth] = useState(0);
+  const [rendering, setRendering] = useState(true);
+
+  // Track the available width so pages always render fit-to-width and sharp.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.floor(entry?.contentRect.width ?? 0);
+      if (w) setWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,11 +49,15 @@ export function PdfView({ blob, page, zoom, onLoaded }: Props) {
           return;
         }
         docRef.current = pdf;
+        // Show the first page immediately; heavy metadata work happens after.
+        setReady(true);
+        onLoaded({ pageCount: pdf.numPages });
 
         const toc = await buildToc(pdf);
+        if (cancelled) return;
         const text = await extractText(pdf, 12);
-        setReady(true);
-        onLoaded({ pageCount: pdf.numPages, toc, text });
+        if (cancelled) return;
+        onMeta?.({ toc, text });
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("This PDF could not be opened.");
@@ -54,7 +73,7 @@ export function PdfView({ blob, page, zoom, onLoaded }: Props) {
   }, [blob]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !width) return;
     let cancelled = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let task: any = null;
@@ -63,22 +82,30 @@ export function PdfView({ blob, page, zoom, onLoaded }: Props) {
       const pdf = docRef.current;
       const canvas = canvasRef.current;
       if (!pdf || !canvas) return;
+      setRendering(true);
       const target = Math.min(Math.max(1, page), pdf.numPages);
       const pdfPage = await pdf.getPage(target);
       if (cancelled) return;
 
+      const base = pdfPage.getViewport({ scale: 1 });
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const viewport = pdfPage.getViewport({ scale: zoom * dpr });
+      const fit = width / base.width;
+      const viewport = pdfPage.getViewport({ scale: fit * dpr });
+
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
       canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
       canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
 
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { alpha: false });
       if (!ctx) return;
       task = pdfPage.render({ canvasContext: ctx, viewport });
       try {
         await task.promise;
+        if (!cancelled) setRendering(false);
+        // Warm the neighbouring pages so navigation feels instant.
+        void pdf.getPage(Math.min(pdf.numPages, target + 1)).catch(() => {});
+        void pdf.getPage(Math.max(1, target - 1)).catch(() => {});
       } catch {
         /* render cancelled */
       }
@@ -88,7 +115,7 @@ export function PdfView({ blob, page, zoom, onLoaded }: Props) {
       cancelled = true;
       if (task) task.cancel?.();
     };
-  }, [page, zoom, ready]);
+  }, [page, ready, width]);
 
   if (error) {
     return (
@@ -99,12 +126,19 @@ export function PdfView({ blob, page, zoom, onLoaded }: Props) {
   }
 
   return (
-    <div className="flex justify-center">
-      <canvas
-        ref={canvasRef}
-        aria-label={`PDF page ${page}`}
-        className="max-w-full rounded-xl border border-border bg-card shadow-[var(--shadow-float)]"
-      />
+    <div ref={wrapRef} className="mx-auto w-full max-w-4xl">
+      <div className="relative">
+        <canvas
+          ref={canvasRef}
+          aria-label={`PDF page ${page}`}
+          className="mx-auto block max-w-full rounded-xl border border-border bg-card shadow-[var(--shadow-float)]"
+        />
+        {(!ready || rendering) && (
+          <div className="absolute inset-0 grid animate-pulse place-items-center rounded-xl bg-card/60 text-xs text-muted-foreground">
+            Rendering page…
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -149,7 +183,7 @@ async function buildToc(pdf: any): Promise<TocItem[]> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function headingsFromText(pdf: any): Promise<TocItem[]> {
   const out: TocItem[] = [];
-  const limit = Math.min(pdf.numPages, 60);
+  const limit = Math.min(pdf.numPages, 40);
   for (let p = 1; p <= limit; p++) {
     try {
       const content = await (await pdf.getPage(p)).getTextContent();
@@ -166,6 +200,8 @@ async function headingsFromText(pdf: any): Promise<TocItem[]> {
     } catch {
       /* skip page */
     }
+    // Yield to the renderer so page rendering stays smooth.
+    if (p % 5 === 0) await new Promise((r) => setTimeout(r, 0));
   }
   if (out.length) return out;
   return Array.from({ length: pdf.numPages }, (_, i) => ({
@@ -192,6 +228,7 @@ async function extractText(pdf: any, maxPages: number) {
     } catch {
       /* skip */
     }
+    await new Promise((r) => setTimeout(r, 0));
   }
   return text.trim();
 }
