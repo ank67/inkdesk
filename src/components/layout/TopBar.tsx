@@ -1,7 +1,6 @@
 import { BookOpen } from "lucide-react";
 import { AppMenu } from "@/components/layout/AppMenu";
 import { AuthButton } from "@/components/layout/AuthButton";
-import { ThemeControls } from "@/components/layout/ThemeControls";
 
 export function TopBar() {
   return (
@@ -17,7 +16,6 @@ export function TopBar() {
         </div>
 
         <div className="flex items-center justify-end gap-0.5">
-          <ThemeControls />
           <AuthButton />
         </div>
       </div>

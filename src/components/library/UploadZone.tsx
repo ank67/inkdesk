@@ -24,7 +24,7 @@ export function UploadZone({ compact = false }: { compact?: boolean }) {
       }}
       className={`rounded-xl border border-dashed transition-colors ${
         over ? "border-primary bg-primary/10" : "border-border bg-card/40"
-      } ${compact ? "p-3" : "p-6"}`}
+      } ${compact ? "p-1.5" : "p-2"}`}
     >
       <input
         ref={inputRef}
@@ -36,13 +36,13 @@ export function UploadZone({ compact = false }: { compact?: boolean }) {
       />
       <button
         onClick={() => inputRef.current?.click()}
-        className="flex w-full flex-col items-center gap-2 text-center"
+        className="flex min-h-9 w-full items-center justify-center gap-2 text-center"
       >
-        <UploadCloud className="size-6 text-accent" aria-hidden="true" />
+        <UploadCloud className="size-4 shrink-0 text-accent" aria-hidden="true" />
         <span className="text-sm font-medium">Add documents</span>
         {!compact && (
-          <span className="text-xs text-muted-foreground">
-            Drop PDF, DOCX, PPTX or TXT — stored offline on this device
+          <span className="hidden truncate text-xs text-muted-foreground sm:inline">
+            — drop PDF, DOCX, PPTX or TXT, stored offline
           </span>
         )}
       </button>
