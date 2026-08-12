@@ -137,39 +137,36 @@ function LibraryPage() {
           </button>
         </div>
 
-        <div className="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2">
-          {CHIPS.map((c) => {
-            const on = chips.includes(c.id);
-            return (
+        {(chips.length > 0 || (tags ?? []).length > 0) && (
+          <div className="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2">
+            {chips.map((c) => (
               <button
-                key={c.id}
-                onClick={() => toggleChip(c.id)}
-                aria-pressed={on}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:scale-105 ${
-                  on ? "border-accent/50 bg-accent/15 text-accent" : "border-border text-muted-foreground"
-                }`}
+                key={c}
+                onClick={() => toggleQuickFilter(c)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-accent/50 bg-accent/15 px-3 py-1.5 text-xs font-medium capitalize text-accent transition-all duration-200 hover:scale-105"
               >
-                <c.icon className="size-3.5" aria-hidden="true" />
-                {c.label}
+                {c === "large" ? "Large files" : c}
+                <X className="size-3" aria-hidden="true" />
               </button>
-            );
-          })}
-          {(tags ?? []).map((t) => {
-            const on = activeTag === t.name;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setActiveTag(on ? null : t.name)}
-                aria-pressed={on}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:scale-105 ${
-                  on ? tagColorClass(t.color) : "border-border text-muted-foreground"
-                }`}
-              >
-                #{t.name}
-              </button>
-            );
-          })}
-        </div>
+            ))}
+            {(tags ?? []).map((t) => {
+              const on = activeTag === t.name;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTag(on ? null : t.name)}
+                  aria-pressed={on}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200 hover:scale-105 ${
+                    on ? tagColorClass(t.color) : "border-border text-muted-foreground"
+                  }`}
+                >
+                  #{t.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
 
         <nav aria-label="Filter by category" className="mx-auto flex max-w-7xl gap-1.5 overflow-x-auto px-3 pb-2">
           {TABS.map((t) => (
