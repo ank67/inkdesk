@@ -4,7 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Grid2x2, List, ScanText, Search, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { db, deleteDoc, tagColorClass, toggleStar, type DocRecord } from "@/lib/db";
-import { useQuickFilters } from "@/lib/quick-filters";
+import { toggleQuickFilter, useQuickFilters } from "@/lib/quick-filters";
 import { DocCard } from "@/components/library/DocCard";
 import { UploadZone } from "@/components/library/UploadZone";
 import { EmptyState } from "@/components/library/EmptyState";
