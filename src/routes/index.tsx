@@ -42,13 +42,6 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
-type ChipId = "recent" | "starred" | "large";
-
-const CHIPS: { id: ChipId; label: string; icon: typeof Clock }[] = [
-  { id: "recent", label: "Recent", icon: Clock },
-  { id: "starred", label: "Starred", icon: Star },
-  { id: "large", label: "Large files", icon: HardDrive },
-];
 
 const LARGE = 5 * 1024 * 1024;
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -57,13 +50,14 @@ function LibraryPage() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [tab, setTab] = useState<TabId>("all");
   const [query, setQuery] = useState("");
-  const [chips, setChips] = useState<ChipId[]>([]);
+  const chips = useQuickFilters();
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [scanOpen, setScanOpen] = useState(false);
 
   const docs = useLiveQuery(() => db.docs.orderBy("addedAt").reverse().toArray(), [], [] as DocRecord[]);
   const tags = useLiveQuery(() => db.tags.toArray(), [], []);
+
 
   const toggleChip = (id: ChipId) => setChips((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
 
