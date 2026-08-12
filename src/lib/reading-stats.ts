@@ -32,7 +32,8 @@ export async function addReadingTime(docId: number, seconds: number) {
 }
 
 export function levelFor(totalMinutes: number) {
-  let current = READER_LEVELS[0];
+  type Level = { level: number; name: string; minMinutes: number };
+  let current: Level = READER_LEVELS[0];
   for (const l of READER_LEVELS) if (totalMinutes >= l.minMinutes) current = l;
   const next = READER_LEVELS.find((l) => l.minMinutes > totalMinutes);
   const span = (next?.minMinutes ?? current.minMinutes) - current.minMinutes;
